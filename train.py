@@ -1,5 +1,10 @@
 import os
 import numpy as np
+import time
+# import sys
+import pybullet_envs  # noqa
+import gym
+
 from gerel.algorithms.RES.population import RESPopulation
 from gerel.algorithms.RES.mutator import RESMutator
 from gerel.populations.genome_seeders import curry_genome_seeder
@@ -7,11 +12,7 @@ from gerel.genome.factories import dense, from_genes
 from gerel.util.datastore import DataStore
 from gerel.model.model import Model
 from batch import BatchJob
-import time
-from stream_redirect import RedirectStream
-import sys
-import pybullet_envs  # noqa
-import gym
+# from stream_redirect import RedirectAllOutput
 
 
 ENV_NAME = 'AntBulletEnv-v0'
@@ -27,29 +28,30 @@ batch_job = BatchJob()
 
 @batch_job
 def compute_fitness(genomes):
-    with RedirectStream(sys.stdout), RedirectStream(sys.stderr):
-        envs = [gym.make(ENV_NAME) for _ in range(len(genomes))]
-        models = [Model(genome) for genome in genomes]
-        action_map = lambda x: np.tanh(np.array(x))  # noqa
-        dones = [False for _ in range(len(genomes))]
-        states = [np.array(env.reset(), dtype='float32') for env in envs]
-        rewards = [0 for _ in range(len(genomes))]
-        for _ in range(STEPS):
-            for index, (model, env, done, state) in \
-                    enumerate(zip(models, envs, dones, states)):
-                if done:
-                    continue
+    # with RedirectAllOutput(sys.stdout, file='process_output_logs.txt'), \
+    #         RedirectAllOutput(sys.stderr, file='process_error_logs.txt'):
+    envs = [gym.make(ENV_NAME) for _ in range(len(genomes))]
+    models = [Model(genome) for genome in genomes]
+    action_map = lambda x: np.tanh(np.array(x))  # noqa
+    dones = [False for _ in range(len(genomes))]
+    states = [np.array(env.reset(), dtype='float32') for env in envs]
+    rewards = [0 for _ in range(len(genomes))]
+    for _ in range(STEPS):
+        for index, (model, env, done, state) in \
+                enumerate(zip(models, envs, dones, states)):
+            if done:
+                continue
 
-                action = model(state)
-                action = action_map(action)
-                next_state, reward, done, _ = env.step(action)
-                rewards[index] += reward
-                dones[index] = done
-                states[index] = next_state
+            action = model(state)
+            action = action_map(action)
+            next_state, reward, done, _ = env.step(action)
+            rewards[index] += reward
+            dones[index] = done
+            states[index] = next_state
 
-        # Closing envs fixes memory leak:
-        for env in envs:
-            env.close()
+    # Closing envs fixes memory leak:
+    for env in envs:
+        env.close()
     return rewards
 
 
@@ -108,7 +110,7 @@ if __name__ == '__main__':
     next_gen = last_gen_ind + 1
     print(f'seeding generation {next_gen} with last best genome: {genome}')
     weights_len = len(genome.edges) + len(genome.nodes)
-    init_mu = np.random.uniform(-1, 1, weights_len)
+    init_mu = np.array(genome.weights)
 
     mutator = RESMutator(
         initial_mu=init_mu,
