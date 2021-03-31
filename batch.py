@@ -23,27 +23,28 @@ The above runs: job(args_1), job(args_2), ... in parrallel and returns
 """
 
 
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
 PROCESSES = cpu_count() - 1
 
 
 class BatchJob:
     def __init__(self, num_processes=PROCESSES):
-        self.in_queue = Queue()
+        self.in_queue = JoinableQueue()
         self.out_queue = Queue()
-        self.processes = []
         self.num_processes = num_processes
 
     def __call__(self, job):
         def batched_job(arg_batch):
-            for ind, arg in enumerate(arg_batch):
-                self.in_queue.put((ind, arg))
-
             def process_task(task_queue, return_queue):
-                while not task_queue.empty():
-                    args_ind, args = task_queue.get()
+                while True:
+                    next_task = task_queue.get()
+                    if next_task is None:
+                        task_queue.task_done()
+                        break
+                    args_ind, args = next_task
                     result = job(args)
+                    task_queue.task_done()
                     return_queue.put((args_ind, result))
                 return True
 
@@ -51,15 +52,18 @@ class BatchJob:
                 p = Process(target=process_task,
                             args=(self.in_queue, self.out_queue))
                 p.start()
-                self.processes.append(p)
 
-            for p in self.processes:
-                p.join()
+            for ind, arg in enumerate(arg_batch):
+                self.in_queue.put((ind, arg))
+
+            for _ in range(self.num_processes):
+                self.in_queue.put(None)
+
+            self.in_queue.join()
 
             results = []
             while not self.out_queue.empty():
                 results.append(self.out_queue.get())
-
             results.sort(key=lambda item: item[0])
             return [r for i, r in results]
         return batched_job

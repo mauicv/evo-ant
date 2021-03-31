@@ -1,9 +1,10 @@
 import os
 import numpy as np
 import time
-# import sys
+import sys
 import pybullet_envs  # noqa
 import gym
+import datetime
 
 from gerel.algorithms.RES.population import RESPopulation
 from gerel.algorithms.RES.mutator import RESMutator
@@ -12,11 +13,11 @@ from gerel.genome.factories import dense, from_genes
 from gerel.util.datastore import DataStore
 from gerel.model.model import Model
 from batch import BatchJob
-# from stream_redirect import RedirectAllOutput
+from stream_redirect import RedirectAllOutput
 
 
 ENV_NAME = 'AntBulletEnv-v0'
-EPISODES = 500
+EPISODES = 5000
 STATE_DIMS = 28
 ACTION_DIMS = 8
 MIN_ACTION = -1
@@ -28,30 +29,30 @@ batch_job = BatchJob()
 
 @batch_job
 def compute_fitness(genomes):
-    # with RedirectAllOutput(sys.stdout, file='process_output_logs.txt'), \
-    #         RedirectAllOutput(sys.stderr, file='process_error_logs.txt'):
-    envs = [gym.make(ENV_NAME) for _ in range(len(genomes))]
-    models = [Model(genome) for genome in genomes]
-    action_map = lambda x: np.tanh(np.array(x))  # noqa
-    dones = [False for _ in range(len(genomes))]
-    states = [np.array(env.reset(), dtype='float32') for env in envs]
-    rewards = [0 for _ in range(len(genomes))]
-    for _ in range(STEPS):
-        for index, (model, env, done, state) in \
-                enumerate(zip(models, envs, dones, states)):
-            if done:
-                continue
+    with RedirectAllOutput(sys.stdout, file=os.devnull), \
+            RedirectAllOutput(sys.stderr, file=os.devnull):
+        envs = [gym.make(ENV_NAME) for _ in range(len(genomes))]
+        models = [Model(genome) for genome in genomes]
+        action_map = lambda x: np.tanh(np.array(x))  # noqa
+        dones = [False for _ in range(len(genomes))]
+        states = [np.array(env.reset(), dtype='float32') for env in envs]
+        rewards = [0 for _ in range(len(genomes))]
+        for _ in range(STEPS):
+            for index, (model, env, done, state) in \
+                    enumerate(zip(models, envs, dones, states)):
+                if done:
+                    continue
 
-            action = model(state)
-            action = action_map(action)
-            next_state, reward, done, _ = env.step(action)
-            rewards[index] += reward
-            dones[index] = done
-            states[index] = next_state
+                action = model(state)
+                action = action_map(action)
+                next_state, reward, done, _ = env.step(action)
+                rewards[index] += reward
+                dones[index] = done
+                states[index] = next_state
 
-    # Closing envs fixes memory leak:
-    for env in envs:
-        env.close()
+        # Closing envs fixes memory leak:
+        for env in envs:
+            env.close()
     return rewards
 
 
@@ -77,9 +78,11 @@ def departition(ls):
 
 
 def print_progress(data):
-    data_string = ''
-    for val in ['generation', 'best_fitness', 'worst_fitness', 'mean_fitness']:
-        data_string += f' {val}: {data[val]}'
+    data_string = f'{data["run_time"]}: gen: {data["generation"]} '
+    for val in ['best_fitness', 'worst_fitness',
+                'mean_fitness']:
+        data_string += f' {val}: {round(data[val])}'
+    data_string += f" ep_time: {data['time']}"
     print(data_string)
 
 
@@ -100,15 +103,16 @@ if __name__ == '__main__':
             weight_low=-2,
             weight_high=2,
             depth=len(LAYER_DIMS))
+        next_gen = last_gen_ind + 1
+        print(f'seeding generation {next_gen} with last best genome: {genome}')
     else:
         genome = dense(
             input_size=STATE_DIMS,
             output_size=ACTION_DIMS,
             layer_dims=LAYER_DIMS
         )
+        print(f'seeding generation 0, with  genome: {genome}')
 
-    next_gen = last_gen_ind + 1
-    print(f'seeding generation {next_gen} with last best genome: {genome}')
     weights_len = len(genome.edges) + len(genome.nodes)
     init_mu = np.array(genome.weights)
 
@@ -128,6 +132,16 @@ if __name__ == '__main__':
         genome_seeder=seeder
     )
 
+    print('population size = 250')
+    print('population type = RESPopulation')
+    print('mutator type = RESMutator')
+    print('num episodes:', EPISODES)
+    print('num steps:', STEPS)
+    print(f'running algorithm on: {batch_job.num_processes} CPUs')
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+    print("Current Time:", current_time)
+
+    init_time = time.time()
     for episode in range(EPISODES):
         start = time.time()
         genes = [g.to_reduced_repr for g in population.genomes]
@@ -137,8 +151,13 @@ if __name__ == '__main__':
             genome.fitness = fitness
         data = population.to_dict()
         mutator(population)
-
-        print_progress(data)
         ds.save(data)
         end = time.time()
-        print(f'time: {end - start}')
+        episode_time = f'{round(end - start)} secs'
+        current_run_time = str(
+            datetime.timedelta(seconds=round(end - init_time)))
+        print_progress({
+            **data,
+            'time': episode_time,
+            'run_time': current_run_time
+        })

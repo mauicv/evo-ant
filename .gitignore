@@ -1,7 +1,8 @@
-test.py
 venv
 __pycache__
 ant_RES_data
 video
 process_error_logs.txt
 process_output_logs.txt
+error_log.txt
+backup

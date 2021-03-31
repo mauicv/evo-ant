@@ -12,6 +12,7 @@ import click
 
 ENV_NAME = 'AntBulletEnv-v0'
 STEPS = 1000
+DIR = './ant_RES_data'
 
 
 def play(genome, record=False, steps=1000):
@@ -45,9 +46,9 @@ def play(genome, record=False, steps=1000):
               help='Generation to play')
 def cli(record, steps, generation):
     if not generation:
-        generation = max([int(i) for i in os.listdir('./ant_RES_data')])
+        generation = max([int(i) for i in os.listdir(DIR)])
 
-    ds = DataStore(name='ant_RES_data')
+    ds = DataStore(name=DIR)
     data = ds.load(generation)
     rewards = play(data['best_genome'], record, steps)
     print(f'generation: {generation}, rewards: {rewards}')
