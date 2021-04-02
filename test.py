@@ -8,28 +8,7 @@ import numpy as np
 STEPS = 100
 ENV_NAME = 'CartPole-v0'
 
-batch_job = BatchJob(num_processes=8)
-
-
-def get_open_fds():
-    '''
-    return the number of open file descriptors for current process
-
-    .. warning: will only work on UNIX-like os-es.
-    '''
-    import subprocess
-    import os
-
-    pid = os.getpid()
-    procs = subprocess.check_output(
-        ["lsof", '-w', '-Ff', "-p", str(pid)])
-    procs = procs.decode('ascii')
-    nprocs = len(
-        list(filter(
-            lambda s: s and s[0] == 'f' and s[1:].isdigit(),
-            procs.split('\n'))
-        ))
-    return nprocs
+batch_job = BatchJob()
 
 
 def compute_fitness(genomes):
@@ -60,54 +39,16 @@ def compute_fitness(genomes):
 if __name__ == '__main__':
     compute_fitness_batch = batch_job(compute_fitness)
 
-    print('comparing parrallel compute times and checking for memory leaks')
+    print(f'Computing best batch_size for {batch_job.num_processes} CPUs')
 
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(100)] for _ in range(1)])
-    end = time.time()
-    print('time (100, 1): ', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(50)] for _ in range(2)])
-    end = time.time()
-    print('time: (50, 2) ', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(25)] for _ in range(4)])
-    end = time.time()
-    print('time: (25, 4)', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(20)] for _ in range(5)])
-    end = time.time()
-    print('time: (20, 5)', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(10)] for _ in range(10)])
-    end = time.time()
-    print('time: (10, 10)', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(5)] for _ in range(20)])
-    end = time.time()
-    print('time: (5, 20)', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(2)] for _ in range(50)])
-    end = time.time()
-    print('time: (2, 50)', end - start)
-    print('num open files:', get_open_fds())
-    start = time.time()
-    for i in range(100):
-        compute_fitness_batch([[0 for i in range(1)] for _ in range(100)])
-    end = time.time()
-    print('time: (1, 100)', end - start)
-    print('num open files:', get_open_fds())
+    batch_data = [(100, 1), (50, 2), (25, 4), (20, 5), (10, 10), (5, 20),
+                  (2, 50), (1, 100)]
+
+    for batch_size, batches in batch_data:
+
+        start = time.time()
+        for i in range(100):
+            compute_fitness_batch([[0 for i in range(100)] for _ in range(1)])
+        end = time.time()
+        s = f'BATCH_SIZE={batch_size}, BATCHES={batches}, time: {end - start}'
+        print(s)

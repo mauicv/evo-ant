@@ -6,13 +6,14 @@ from gerel.util.datastore import DataStore
 from gerel.model.model import Model
 from gym.wrappers import Monitor
 import click
+import time
 
 
 #  https://www.etedal.net/2020/04/pybullet-panda_2.html
 
 ENV_NAME = 'AntBulletEnv-v0'
 STEPS = 1000
-DIR = './ant_RES_data'
+DIR = './assets/example/'
 
 
 def play(genome, record=False, steps=1000):
@@ -28,6 +29,7 @@ def play(genome, record=False, steps=1000):
     i = 0
     while not done and i < STEPS:
         i += 1
+        time.sleep(0.007)
         action = model(state)
         action = action_map(action)
         next_state, reward, done, _ = env.step(action)
@@ -44,11 +46,13 @@ def play(genome, record=False, steps=1000):
               help='Max number of steps per episode')
 @click.option('--generation', '-g', default=None, type=int,
               help='Generation to play')
-def cli(record, steps, generation):
+@click.option('--dir', '-d', default=DIR,
+              help='working folder')
+def cli(record, steps, generation, dir):
     if not generation:
-        generation = max([int(i) for i in os.listdir(DIR)])
+        generation = max([int(i) for i in os.listdir(dir)])
 
-    ds = DataStore(name=DIR)
+    ds = DataStore(name=dir)
     data = ds.load(generation)
     rewards = play(data['best_genome'], record, steps)
     print(f'generation: {generation}, rewards: {rewards}')

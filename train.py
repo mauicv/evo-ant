@@ -24,6 +24,8 @@ MIN_ACTION = -1
 MAX_ACTION = 1
 STEPS = 500
 LAYER_DIMS = [20, 20]
+DIR = 'ant_RES_data'
+BATCH_SIZE = 25
 batch_job = BatchJob()
 
 
@@ -87,8 +89,8 @@ def print_progress(data):
 
 
 if __name__ == '__main__':
-    ds = DataStore(name='ant_RES_data')
-    generation_inds = [int(i) for i in os.listdir('./ant_RES_data')]
+    ds = DataStore(name=f'{DIR}')
+    generation_inds = [int(i) for i in os.listdir(f'./{DIR}')]
     if generation_inds:
         last_gen_ind = max(generation_inds)
         last_gen = ds.load(last_gen_ind)
@@ -145,7 +147,7 @@ if __name__ == '__main__':
     for episode in range(EPISODES):
         start = time.time()
         genes = [g.to_reduced_repr for g in population.genomes]
-        partitioned_population = partition(genes, 25)
+        partitioned_population = partition(genes, BATCH_SIZE)
         scores = departition(compute_fitness(partitioned_population))
         for genome, fitness in zip(population.genomes, scores):
             genome.fitness = fitness
