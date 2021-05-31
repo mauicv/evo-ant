@@ -45,10 +45,9 @@ if __name__ == '__main__':
                   (2, 50), (1, 100)]
 
     for batch_size, batches in batch_data:
-
         start = time.time()
-        for i in range(100):
-            compute_fitness_batch([[0 for i in range(100)] for _ in range(1)])
+        compute_fitness_batch([[0 for i in range(batch_size)]
+                               for _ in range(batches)])
         end = time.time()
         s = f'BATCH_SIZE={batch_size}, BATCHES={batches}, time: {end - start}'
         print(s)
